@@ -1,7 +1,10 @@
 import torch
 import torch.optim as optim
+from torch.nn.functional import mse_loss
 import numpy as np
 from scipy.stats import spearmanr
+from sklearn.ensemble import RandomForestClassifier as RFC
+from sklearn.model_selection import GridSearchCV
 
 
 def get_optimizers(model, optimizer, lr_model, lr_discriminator, weight_decay):
@@ -68,11 +71,126 @@ def get_adv_loss(dataset, y_scan, y_scan_hat, weight_scan, domain_classification
     return loss
 
 
+def var_exp(total_variance, x, x_rec):
+    """
+    Calculates the mean variance explained across samples (cells)
+    :param total_variance: torch Tensor of shape # samples, 1
+    :param x: torch Tensor of shape # samples x
+    :param x_rec:
+    :return:
+    """
+    mse = torch.sum(mse_loss(x_rec, x, reduction="none"), dim=1)
+    return torch.mean(1 - mse/total_variance).item()
+
+
 def correlate(a, b):
     x = a.detach().cpu().numpy()
     y = b.detach().cpu().numpy()
     corrs = [spearmanr(i, j) for i, j in zip(x, y)]
     return np.mean(corrs)
+
+
+def least_squares_decoding(z_train_, x_train_, z_val_, x_val_):
+    z_train = z_train_.detach().cpu().numpy()
+    x_train = x_train_.detach().cpu().numpy()
+    z_val = z_val_.detach().cpu().numpy()
+    x_val = x_val_.detach().cpu().numpy()
+    X = z_train.copy()
+    beta = np.linalg.pinv(X.T.dot(X)).dot(X.T.dot(x_train))
+    x_val_ = z_val.dot(beta)
+    res = x_val - x_val_
+    var_exp = 1 - np.sum(res**2) / np.sum(x_val**2)
+    corrs = [spearmanr(i, j) for i, j in zip(x_val, x_val_)]
+    return var_exp, np.mean(corrs)
+
+
+def final_evaluate(net, dataset, x_train, x_val, total_variance_val, y_scan_train,
+                   y_type_train, y_scan_val, y_type_val):
+    # make predictions
+    net.eval()
+    z, y_scan, y_type, x_rec = net(x_train)
+    z_val, y_scan_val_pred, y_type_val_pred, x_rec_val = net(x_val)
+
+    res_val = (x_val - x_rec_val) ** 2
+    corr_val = correlate(x_val, x_rec_val)
+    ve_val = torch.mean(
+        1 - torch.sum(res_val, 1) / total_variance_val).item()
+    _, predicted = torch.max(y_scan_val_pred, 1)
+    accuracy_scan = (predicted == y_scan_val).double().mean().item()
+    _, predicted = torch.max(y_type_val_pred, 1)
+    accuracy_type = (predicted == y_type_val).double().mean().item()
+
+    # also do least_squares_decoding
+    lsq_var_exp, lsq_corrs = least_squares_decoding(z, x_train, z_val, x_val)
+
+    # use latents for all models:
+    model_output_train = z.detach().cpu().numpy()
+    model_output_val = z_val.detach().cpu().numpy()
+    y_scan_train = y_scan_train.detach().cpu().numpy()
+    y_scan_val = y_scan_val.detach().cpu().numpy()
+    y_type_train = y_type_train.detach().cpu().numpy()
+    y_type_val = y_type_val.detach().cpu().numpy()
+
+    assert not net.training, "net is in training mode"
+
+    # Grid search
+    train_idx, val_idx = dataset.val_splits[0]
+    clf_input = np.zeros(
+        (model_output_train.shape[0] + model_output_val.shape[0],
+         model_output_train.shape[1]))
+    clf_scan_target = np.zeros(
+        model_output_train.shape[0] + model_output_val.shape[0])
+    clf_type_target = np.zeros(
+        model_output_train.shape[0] + model_output_val.shape[0])
+    clf_input[train_idx] = model_output_train
+    clf_input[val_idx] = model_output_val
+    clf_scan_target[train_idx] = y_scan_train
+    clf_scan_target[val_idx] = y_scan_val
+    # get Franke idxs into train+val dataset
+    franke_only = np.where(clf_scan_target == 0)[0]
+    # get those training indexes that are Franke samples
+    train_idx_franke = list(set(franke_only).intersection(set(train_idx)))
+    # get those validation indexes that are Franke samples
+    val_idx_franke = list(set(franke_only).intersection(set(val_idx)))
+    clf_type_target[train_idx] = y_type_train
+    clf_type_target[val_idx] = y_type_val
+
+    # Train classifiers first
+    scan_clf_param_grid = dict(
+        n_estimators=[5, 10, 20, 30], max_depth=[5, 10, 15, 20, None],
+        ccp_alpha=[0, 0.001, 0.01], max_samples=[0.5, 0.7, 0.9, 1]
+    )
+    grid_search_scan = GridSearchCV(estimator=RFC(),
+                                    param_grid=scan_clf_param_grid,
+                                    cv=[dataset.val_splits[0]], n_jobs=1,
+                                    refit=False)
+    grid_search_scan.fit(clf_input, clf_scan_target)
+    scan_classifier = RFC(**grid_search_scan.best_params_)
+    scan_classifier.fit(model_output_train, y_scan_train)
+    final_scan_acc = scan_classifier.score(model_output_val, y_scan_val)
+
+    ### train type classifier
+    grid_search_type = GridSearchCV(estimator=RFC(),
+                                    param_grid=scan_clf_param_grid,
+                                    cv=[[train_idx_franke, val_idx_franke]],
+                                    n_jobs=1, refit=False)
+    grid_search_type.fit(clf_input, clf_type_target)
+    type_classifier = RFC(**grid_search_type.best_params_)
+    type_classifier.fit(
+        model_output_train[y_scan_train == 0], y_type_train[y_scan_train == 0]
+    )
+    final_type_acc = type_classifier.score(
+        model_output_val[y_scan_val == 0], y_type_val[y_scan_val == 0]
+    )
+    res_dict = dict(val_corr=corr_val,
+                    var_exp=ve_val,
+                    type_acc=accuracy_type,
+                    adv_acc=accuracy_scan,
+                    final_type_acc=final_type_acc,
+                    final_scan_acc=final_scan_acc,
+                    lsq_var_exp=lsq_var_exp,
+                    lsq_corrs=lsq_corrs)
+    return res_dict, grid_search_type, grid_search_scan
 
 
 class ModelOutputs:
