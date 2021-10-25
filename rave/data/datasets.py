@@ -1,5 +1,5 @@
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, Sampler
 import numpy as np
 from rave.data.dataloading import data_loader_bc, data_loader_sim
 from rave.data.utils import combine_data_bc, get_splits
@@ -192,13 +192,18 @@ class BipCellDataset(Dataset):
         return self.ipl_depth_train[train_ind], self.ipl_depth_train[val_ind]
 
     def __len__(self):
-        return self.X_train.shape[0]
+        train_ind, val_ind = self.val_splits[0]
+        return len(train_ind)
 
     def __getitem__(self, idx):
+        train_idx, val_idx = self.val_splits[0]
         if self.Y_type_train is not None:
-            return self.X_train[idx], self.Y_scan_train[idx], self.Y_type_train[idx]
+            return self.X_train[train_idx[idx]], \
+                   self.Y_scan_train[train_idx[idx]], \
+                   self.Y_type_train[train_idx[idx]]
         else:
-            return self.X_train[idx], self.Y_scan_train[idx]
+            return self.X_train[train_idx[idx]], \
+                   self.Y_scan_train[train_idx[idx]]
 
     def get_split_numpy(self, split=0):
         train_ind, val_ind = self.val_splits[split]
