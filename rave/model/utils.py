@@ -49,24 +49,27 @@ def get_loss(dataset, x, y_scan, y_type, x_rec, y_scan_hat, y_type_hat,
     domain_loss = 0
     for d in dataset.scan_label:
         idxs = y_scan == d
-        recon_loss += reconstruction_loss(x_rec[idxs, :], x[idxs, :])
-        domain_loss += domain_classification_loss(y_scan_hat[idxs], y_scan[idxs])
+        if torch.any(idxs):
+            recon_loss += reconstruction_loss(x_rec[idxs, :], x[idxs, :])
+            domain_loss += domain_classification_loss(y_scan_hat[idxs], y_scan[idxs])
     for c in dataset.type_label:
         idxs = y_type == c
-        type_loss += type_classification_loss(y_type_hat[idxs], y_type[idxs])
+        if torch.any(idxs):
+            type_loss += type_classification_loss(y_type_hat[idxs], y_type[idxs])
     loss = weight_recon * recon_loss + weight_type * type_loss
     # print(recon_loss.detach().cpu().numpy(), type_loss.detach().cpu().numpy(),
     #       domain_loss.detach().cpu().numpy())
     if adversarial_training:
         loss -= weight_scan * domain_loss
-    return loss
+    return loss, recon_loss, type_loss
 
 
 def get_adv_loss(dataset, y_scan, y_scan_hat, domain_classification_loss):
     domain_loss = 0
     for d in dataset.scan_label:
         idxs = y_scan == d
-        domain_loss += domain_classification_loss(y_scan_hat[idxs], y_scan[idxs])
+        if torch.any(idxs):
+            domain_loss += domain_classification_loss(y_scan_hat[idxs], y_scan[idxs])
     return domain_loss
 
 
