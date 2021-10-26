@@ -62,13 +62,12 @@ def get_loss(dataset, x, y_scan, y_type, x_rec, y_scan_hat, y_type_hat,
     return loss
 
 
-def get_adv_loss(dataset, y_scan, y_scan_hat, weight_scan, domain_classification_loss):
+def get_adv_loss(dataset, y_scan, y_scan_hat, domain_classification_loss):
     domain_loss = 0
     for d in dataset.scan_label:
         idxs = y_scan == d
         domain_loss += domain_classification_loss(y_scan_hat[idxs], y_scan[idxs])
-    loss = weight_scan * domain_loss
-    return loss
+    return domain_loss
 
 
 def var_exp(total_variance, x, x_rec):
