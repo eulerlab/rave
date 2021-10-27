@@ -1,10 +1,12 @@
 import numpy as np
 from sklearn.metrics.cluster import adjusted_rand_score
 from copy import deepcopy
-from scipy import io
 from sklearn.ensemble import RandomForestClassifier as RFC
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import adjusted_rand_score as ari
+from scipy import io
+from scipy.stats import gaussian_kde
+from scipy.spatial.distance import jensenshannon
 
 from rave.evaluation.metrics import get_js_div, get_kde_per_type
 
@@ -152,7 +154,7 @@ def get_all_scores(
     confidence = np.zeros((model_output_test.shape[0], len(seeds)))
     acc_dom = np.zeros(len(seeds))
     ari_dom = np.zeros(len(seeds))
-    print("")
+    print("start grid search")
     scan_clf_param_grid = dict(class_weight=["balanced"],
         n_estimators=[5, 10, 20, 30],
                                max_depth=[5, 10, 15, 20, None],
@@ -280,3 +282,38 @@ def get_all_scores(
     return result_dictionary, [acc_dom, acc_type, ari_dom, \
            js_depth, js_normalized, kde_per_type_all, y_type_test_post, y_scan_test_post, \
            confidence, y_type_test_rl, ari_cross, best_scan_clf, best_type_clf]
+
+
+def get_type_js(dataset, ipl_dict, result_dict):
+    """
+    Calculates the Jensen-Shannon distance for distributions across types p(type),
+    estimated from EM prior + depth sampling distribution on the one hand
+    (p_EM(type) = p_EM(type|depth) * p_scan(depth)
+    and from cell type assignments by given method on the other hand
+    (p_method(type)).
+
+    Inputs:
+    dataset: Dataset object (rave.data.datasets)
+    ipl_dict: load from '/gpfs01/euler/data/Resources/Classifier/data/ipl.mat'
+    result_dict: result dictionary output by get_all_scores for current method
+    """
+    # get KDE estimator for sampling depth from dataset B (Szatko scan)
+    szatko_bool = dataset.Y_scan_test == 1
+    depth_kde_estimator = gaussian_kde(dataset.ipl_depth_test[szatko_bool])
+    # evaluate KDE across the depth range known for EM
+    kde_across_depth = depth_kde_estimator.evaluate(ipl_dict["d"])
+    # normalize
+    kde_across_depth /= kde_across_depth.sum()
+    # p(type) =  p(depth) * p(type|depth)
+    p_type_em = np.dot(kde_across_depth, ipl_dict["prior"])
+    # get probability dist. across types for current method
+    n_classifier_seeds = result_dict["y_type_test_post"][szatko_bool].shape[1]
+    bin_counts = np.asarray(
+        [np.bincount(
+            result_dict["y_type_test_post"][szatko_bool][:, s].astype(int),
+            minlength=14
+        ) for s in range(n_classifier_seeds)])
+    bin_counts_normed = np.asarray([bc / bc.sum() for bc in bin_counts])
+    mean_bin_counts = bin_counts_normed.mean(axis=0)
+    js_em = jensenshannon(p_type_em, mean_bin_counts)
+    return kde_across_depth, p_type_em, js_em
