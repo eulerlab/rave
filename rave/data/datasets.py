@@ -198,12 +198,15 @@ class BipCellDataset(Dataset):
     def __getitem__(self, idx):
         train_idx, val_idx = self.val_splits[0]
         if self.Y_type_train is not None:
-            return self.X_train[train_idx[idx]], \
-                   self.Y_scan_train[train_idx[idx]], \
-                   self.Y_type_train[train_idx[idx]]
+            return torch.as_tensor(self.X_train[train_idx[idx]],
+                                   device="cuda"), \
+                   torch.as_tensor(self.Y_scan_train[train_idx[idx]],
+                                   dtype=torch.long, device="cuda"), \
+                   torch.as_tensor(self.Y_type_train[train_idx[idx]],
+                                   dtype=torch.long, device="cuda")
         else:
-            return self.X_train[train_idx[idx]], \
-                   self.Y_scan_train[train_idx[idx]]
+            return self.X_train[train_idx[idx]].to("cuda"), \
+                   self.Y_scan_train[train_idx[idx]].to("cuda")
 
     def get_split_numpy(self, split=0):
         train_ind, val_ind = self.val_splits[split]
