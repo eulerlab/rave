@@ -57,8 +57,6 @@ def get_loss(dataset, x, y_scan, y_type, x_rec, y_scan_hat, y_type_hat,
         if torch.any(idxs):
             type_loss += type_classification_loss(y_type_hat[idxs], y_type[idxs])
     loss = weight_recon * recon_loss + weight_type * type_loss
-    # print(recon_loss.detach().cpu().numpy(), type_loss.detach().cpu().numpy(),
-    #       domain_loss.detach().cpu().numpy())
     if adversarial_training:
         loss -= weight_scan * domain_loss
     return loss, recon_loss, type_loss
@@ -73,7 +71,7 @@ def get_adv_loss(dataset, y_scan, y_scan_hat, domain_classification_loss):
     return domain_loss
 
 
-def var_exp(total_variance, x, x_rec):
+def var_exp(x, x_rec):
     """
     Calculates the mean variance explained across samples (cells)
     :param total_variance: torch Tensor of shape # samples, 1
@@ -81,6 +79,7 @@ def var_exp(total_variance, x, x_rec):
     :param x_rec:
     :return:
     """
+    total_variance = torch.sum(x ** 2, 1).to(x.device)
     mse = torch.sum(mse_loss(x_rec, x, reduction="none"), dim=1)
     return torch.mean(1 - mse/total_variance).item()
 
