@@ -1,21 +1,17 @@
 import os
 import pickle as pkl
-import numpy as np
 from ray import tune
-import torch
 import time
-from torch import nn
+import torch
+import numpy as np
 from torch.utils.data import DataLoader, BatchSampler, SequentialSampler
-from sklearn.ensemble import RandomForestClassifier as RFC
-from sklearn.model_selection import ParameterGrid, GridSearchCV
-from scipy.stats import spearmanr
 import random
 
-from rave.model.architectures import Autoencoder, ResidualModel, CustomDataParallel
+from rave.model.architectures import Autoencoder, CustomDataParallel
 from rave.model.utils import *
-from typing import Dict, AnyStr
+from typing import Dict
 from rave.utils.import_helpers import dynamic_import, split_module_name
-from rave.data.datasets import get_bc_data, get_bc_sim_data
+from rave.data.datasets import get_bc_data
 
 
 def custom_collate_fn(input_list):
@@ -30,12 +26,23 @@ def train_model(config: Dict):
     :param hypersearch:
     :return:
     """
-    ''' Set up training '''
+    '''####################   Set up training  #######################'''
     if config.get("rng_seed", False):
         torch.manual_seed(config["rng_seed"])
         random.seed(config["rng_seed"])
         np.random.seed(config["rng_seed"])
     hypersearch = config.get("hypersearch", False)
+
+    '''  set device '''
+    device = config.get("device", False)
+    if not device:
+        print("Device not specified; training on GPU if available")
+        if torch.cuda.is_available():
+            device = "cuda"
+        else:
+            device = "cpu"
+
+    ''' Get dataset '''
     dataset = config.get("dataset", False)
     if not dataset:
         datatype = config.get("datatype", "bc")
@@ -50,27 +57,10 @@ def train_model(config: Dict):
             raise NotImplementedError("Datatype {} is not supported yet. Please implement"
                             "dataloading for your datatype".format(datatype))
 
-    if config["model_architecture"] == "autoencoder":
-        net = Autoencoder(input_shape=dataset.D, **config["model"],
-                          device=config["device"])
-    elif config["model_architecture"] == "resnet":
-        raise NotImplementedError()
-        # net = ResidualModel(input_shape=dataset.D, **config["model"])
-    else:
-        raise NotImplementedError("Model {} not implemented yet".format(
-            config["model_architecture"]
-        ))
-
-    device = config["device"]
-    if torch.cuda.is_available():
-        device = "cuda"
-        if torch.cuda.device_count() > 1:
-            net = CustomDataParallel(net)
-    net.to(device)
     if dataset.Y_type is not None:
         [x_train_full, y_scan_train_full, x_val, y_scan_val, y_type_train_full,
          y_type_val] = dataset.get_split(config["training"]["split"],
-                                         device=config["device"])
+                                         device=device)
     else:
         raise NotImplementedError
         # x_train, y_scan_train, x_val, y_scan_val = \
@@ -79,6 +69,23 @@ def train_model(config: Dict):
     total_variance_train = torch.sum(x_train_full ** 2, 1).to(device)
     total_variance_val = torch.sum(x_val ** 2, 1).to(device)
 
+    ''' Get model '''
+    if config["model_architecture"] == "autoencoder":
+        net = Autoencoder(input_shape=dataset.D, **config["model"],
+                          device=device)
+    elif config["model_architecture"] == "resnet":
+        raise NotImplementedError()
+        # net = ResidualModel(input_shape=dataset.D, **config["model"])
+    else:
+        raise NotImplementedError("Model {} not implemented yet".format(
+            config["model_architecture"]
+        ))
+    if device == "cuda":
+        if torch.cuda.device_count() > 1:
+            net = CustomDataParallel(net)
+    net.to(device)
+
+    ''' Unpack training config dict '''
     dis_warm_cool_steps = config["training"].get("dis_warm_cool_steps")
     optimizer = config["training"].get("optimizer")
     lr_model = config["training"].get("lr_model")
@@ -93,7 +100,6 @@ def train_model(config: Dict):
     weight_scan = config["training"]["weight_scan"]
     batch_size = config["training"]["batch_size"]
     reconstruction_loss_str = config["training"]["reconstruction_loss"]
-    # ToDo: Figure out what optim_step_count should be
     optim_step_count = config["training"]["optim_step_count"]
     type_classification_loss_str = config["training"]\
         ["type_classification_loss"]
@@ -112,6 +118,7 @@ def train_model(config: Dict):
     if dis_warm_cool_steps > 0:
         #  Train without adversarial loss for dis_warm_cool_steps epochs
         adversarial_training = False
+    print("adversarial training: {}".format(adversarial_training))
     if config["model_type"] == "specific":
         weight_mse = 0.0
         print("Setting weight_mse (reconstruction loss weight) to 0"
@@ -124,20 +131,10 @@ def train_model(config: Dict):
     if train_model_every > 1:
         num_iter *= train_model_every
 
-    var_exp_train, var_exp_val = [], []
-    adv_acc_train, adv_acc_val = [], []
-    type_acc_train, type_acc_val = [], []
     optimizer_model, optimizer_discriminator = get_optimizers(
         net, optimizer, lr_model, lr_discriminator, weight_decay)
-    print("adversarial training: {}".format(adversarial_training))
-    t0 = time.time()
-    var_exp_train, var_exp_val = [], []
-    adv_acc_train, adv_acc_val = [], []
-    type_acc_train, type_acc_val = [], []
-    steps_val = []
-    run_ve = 0.0
-    run_adv_acc = 0.0
-    run_type_acc = 0.0
+
+    ''' Get (dummy) dataloader '''
     if config["training"].get("batched_training", False) or batch_size < x_train_full.shape[0]:
         dataloader = DataLoader(dataset,
                                 sampler=BatchSampler(SequentialSampler(dataset),
@@ -147,19 +144,30 @@ def train_model(config: Dict):
                                 collate_fn=custom_collate_fn)
     else:  # define dummy iterable dataloader
         dataloader = [dataset[:]]
+
+    ''' define logging variables '''
+    var_exp_train, var_exp_val = [], []
+    adv_acc_train, adv_acc_val = [], []
+    type_acc_train, type_acc_val = [], []
+    steps_val = []
+    run_ve = 0.0
+    run_adv_acc = 0.0
+    run_type_acc = 0.0
     loss_mse_all = np.zeros(num_iter+1)
     loss_type_all = np.zeros(num_iter+1)
     loss_adv_all = np.zeros(num_iter+1)
     total_loss = np.zeros(num_iter+1)
+    t0 = time.time()
+
     ''' Start training loop '''
     for i in range(num_iter + 1):
         # Model Training
         for batch_no, (x_train, y_scan_train, y_type_train) in enumerate(dataloader):
             optimizer_model.zero_grad()
             z, y_scan, y_type, x_rec = net(x_train)
-            loss, loss_mse, loss_type = get_loss(dataset, x_train, y_scan_train, y_type_train,
-                            x_rec,
-                            y_scan, y_type, weight_mse, weight_scan,
+            loss, loss_mse, loss_type = get_loss(
+                dataset, x_train, y_scan_train, y_type_train, x_rec, y_scan,
+                y_type, weight_mse, weight_scan,
                             weight_type, reconstruction_loss_fn,
                             type_classification_loss_fn,
                             domain_classification_loss_fn, adversarial_training)
