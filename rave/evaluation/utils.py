@@ -41,3 +41,29 @@ def print_result_dictionary(result_dictionary, dataset):
     print("Mean +- SD ari cross for dataset 1 (consistency between cell type"
           "labels assigned by 10 different type clfs): {:.3f} +- {:.2f}".format(
             result_dictionary["ari_cross"].mean(), result_dictionary["ari_cross"].std()))
+
+
+def get_sim_ground_truth_labels(y_type_train, y_scan_train, y_type_val,
+                                y_scan_val, y_type_test, y_scan_test):
+    """
+    Only for simulated data with ground truth type labels for dataset B:
+    take type labels ranging from -1 to -14 (to be compatible with the
+    dataset function) and map them to labels ranging from 0 to 13 (-1 -> 0,
+    -2 -> 1, ..., -14 -> 13)
+    :param y_type_test:
+    :param y_scan_test:
+    :return:
+    """
+    y_type_test_gt = deepcopy(y_type_test)
+    y_type_test_gt[y_scan_test == 1] *= -1
+    y_type_test_gt[y_scan_test == 1] -= 1
+
+    y_type_val_gt = deepcopy(y_type_val)
+    y_type_val_gt[y_scan_val == 1] *= -1
+    y_type_val_gt[y_scan_val == 1] -= 1
+
+    y_type_train_gt = deepcopy(y_type_train)
+    y_type_train_gt[y_scan_train == 1] *= -1
+    y_type_train_gt[y_scan_train == 1] -= 1
+    assert np.all(y_type_test_gt[y_type_test==-14] == 13), "Conversion failed"
+    return y_type_train_gt, y_type_val_gt, y_type_test_gt
