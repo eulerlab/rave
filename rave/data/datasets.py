@@ -9,7 +9,7 @@ def get_bc_data(data_dir, franke_file_name="bc_franke.pickle",
                 szatko_file_name="bc_szatko.pickle", verbose=True):
     bc_old, bc_new = data_loader_bc(data_dir, franke_file_name, szatko_file_name)
     X, _, _, scan_label, type_label, ipl_depths = combine_data_bc(bc_old, bc_new)
-    dataset = Dataset(X, Y_scan=scan_label, Y_type=type_label,
+    dataset = BipCellDataset(X, Y_scan=scan_label, Y_type=type_label,
                       ipl_depths=ipl_depths, verbose=verbose)
     return dataset
 
