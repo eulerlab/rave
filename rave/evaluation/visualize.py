@@ -16,7 +16,7 @@ from rave.evaluation.embed import get_embedding
 def visualize_embedding_basic(model, dataset, datatier, embedding=None,
                               embedder=None, embedding_settings={},
                               embedding_input_version = "raw", scan_label_vers="raw",
-                              type_label_vers="raw",
+                              type_label_vers="raw", type_label=None, scan_label=None,
                               dataset_cmap=mpl.colors.ListedColormap(
                                   ['tab:green', 'darkorange']),
                               type_cmap="tab20b", depth_cmap="RdBu",
@@ -30,35 +30,37 @@ def visualize_embedding_basic(model, dataset, datatier, embedding=None,
     ipl_depth_test = dataset.ipl_depth_test
     y_scan_test = dataset.Y_scan_test
     ''' Get the scan label'''
-    if scan_label_vers == "raw":
-        if datatier == "train":
-            scan_label = y_scan_train
-        elif datatier == "val":
-            scan_label = y_scan_val
-        elif datatier == "test":
-            scan_label = dataset.Y_scan_test
-    elif scan_label_vers == "rave":
-        key = "y_scan_{}_hat".format(datatier)
-        scan_label = getattr(model_outputs, key)
-
-    ''' Get the type label '''
-    if type_label_vers == "raw":
-        if datatier == "train":
-            type_label = y_type_train
-        elif datatier == "val":
-            type_label = y_type_val
-        elif datatier == "test":
-            type_label = dataset.Y_type_test
-        # for dataset creation, the labels of dataset 1 are signflipped and
-        # indexing starts at 1; revert this here
-        bool_mask = locals()["y_scan_{}".format(datatier)] == 1
-        new_type_label = deepcopy(type_label)
-        new_type_label[bool_mask] *= -1
-        new_type_label[bool_mask] -= 1
-    elif type_label_vers == "rave":
-        key = "y_type_{}_hat".format(datatier)
-        new_type_label = getattr(model_outputs, key)
-
+    if scan_label is None:
+        if scan_label_vers == "raw":
+            if datatier == "train":
+                scan_label = y_scan_train
+            elif datatier == "val":
+                scan_label = y_scan_val
+            elif datatier == "test":
+                scan_label = dataset.Y_scan_test
+        elif scan_label_vers == "rave":
+            key = "y_scan_{}_hat".format(datatier)
+            scan_label = getattr(model_outputs, key)
+    if type_label is None:
+        ''' Get the type label '''
+        if type_label_vers == "raw":
+            if datatier == "train":
+                type_label = y_type_train
+            elif datatier == "val":
+                type_label = y_type_val
+            elif datatier == "test":
+                type_label = dataset.Y_type_test
+            # for dataset creation, the labels of dataset 1 are signflipped and
+            # indexing starts at 1; revert this here
+            bool_mask = locals()["y_scan_{}".format(datatier)] == 1
+            new_type_label = deepcopy(type_label)
+            new_type_label[bool_mask] *= -1
+            new_type_label[bool_mask] -= 1
+        elif type_label_vers == "rave":
+            key = "y_type_{}_hat".format(datatier)
+            new_type_label = getattr(model_outputs, key)
+    else:
+        new_type_label = type_label
     ''' Get the embedding '''
     if embedding is None or embedder is None:
         if embedding_input_version == "raw":
@@ -91,9 +93,6 @@ def visualize_embedding_basic(model, dataset, datatier, embedding=None,
                      norm=dataset_norm, marker="."
                      )
     sc_map = ScalarMappable(norm=dataset_norm, cmap=dataset_cmap)
-    # cbar = plt.colorbar(sc_map, ax=axd["A"])
-    # cbar.set_label("Dataset", rotation=90)
-    # cbar.ax.get_yaxis().labelpad = 15
     labels = ["Dataset A", "Dataset B"]
     legend_elements = [Line2D([0], [0], linestyle="", marker='o',
                               color=sc_map.to_rgba(i), label=labels[i],
@@ -106,9 +105,6 @@ def visualize_embedding_basic(model, dataset, datatier, embedding=None,
     out = axd["B"].scatter(*embedding.transpose(), c=new_type_label, cmap=type_cmap,
                            norm=type_norm, marker=".")
     sc_map = ScalarMappable(norm=type_norm, cmap=type_cmap)
-    # cbar = plt.colorbar(out, ax=axd["B"])
-    # cbar.set_label("Cell Type", rotation=90)
-    # cbar.ax.get_yaxis().labelpad = 15
 
     labels = type_names
     legend_elements = [Line2D([0], [0], linestyle="", marker='o',
@@ -128,14 +124,6 @@ def visualize_embedding_basic(model, dataset, datatier, embedding=None,
     cbar = plt.colorbar(sc_map, ax=axd["C"])
     cbar.set_label("IPL depth", rotation=90)
     cbar.ax.get_yaxis().labelpad = 15
-    # sns.scatterplot(data=df, x="x", y="y", hue="scan_label",
-    #                 palette=dataset_cmap, ax=axd["A"])
-    #
-    # sns.scatterplot(data=df, x="x", y="y", hue="new_type_label",
-    #                 palette=type_cmap, ax=axd["B"])
-    #
-    # sns.scatterplot(data=df, x="x", y="y", hue="ipl_depth",
-    #                 palette=depth_cmap, ax=axd["C"])
     for ax in axd.values():
         ax.axis("off")
     return fig, embedding, embedder

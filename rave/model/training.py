@@ -36,11 +36,13 @@ def train_model(config: Dict):
     '''  set device '''
     device = config.get("device", False)
     if not device:
-        print("Device not specified; training on GPU if available")
         if torch.cuda.is_available():
+            print("Device not specified; training on GPU")
+
             device = "cuda"
         else:
             device = "cpu"
+            print("Device not specified; training on CPU")
 
     ''' Get dataset '''
     dataset = config.get("dataset", False)

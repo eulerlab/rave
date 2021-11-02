@@ -199,7 +199,7 @@ class BipCellDataset(Dataset):
         train_idx, val_idx = self.val_splits[0]
         if self.Y_type_train is not None:
             return torch.as_tensor(self.X_train[train_idx[idx]],
-                                   device="cuda"), \
+                                   device="cuda", dtype=torch.float32), \
                    torch.as_tensor(self.Y_scan_train[train_idx[idx]],
                                    dtype=torch.long, device="cuda"), \
                    torch.as_tensor(self.Y_type_train[train_idx[idx]],
