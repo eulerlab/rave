@@ -4,20 +4,21 @@ This repository is the official implementation of [https://www.biorxiv.org/conte
 
 ![schematic](framework.jpg)
 
-## Requirements
+## Getting started
 
-To install requirements:
-
-```setup
-pip install -r requirements.txt
-```
+### Disclaimer: Work in progress
+We're working on turning the code in this repository into the pip-installable RAVE-toolbox for removing inter-experimental variability from experiments. For the moment being, you can use it to reproduce the figures from our paper by following the instructions below.
+1. ´´´ git clone ´´´ the repository onto your machine
+2. Have a look at the packages listed in the requirements file; make sure to remove already installed packages from the list, or to specify specific package versions in case you need them for other projects you're working on. 
+3. From within the directory containing the ```requirements.txt``` file, run ```pip install -r requirements.txt```
 
 ## Downloading the necessary files
+You can download the data we worked with from here: [https://datadryad.org/stash/share/_8RgRqJg8KgfEI2apytiXg5jrB-vlI7iCTJH6NjzkOY]
 In order to reproduce the figures from the paper, you need the following data files:
-- Recordings from bipolar cells: path_to_file
-- simulated bipolar cell responses: path_to_file
-- IPL info files: path_to_file
-
+- Recordings from bipolar cells: Datasets/bio/...
+- simulated bipolar cell responses: Datasets/silico/...
+- IPL info files: Datasets/ipl/...
+- 
 ## Reproducing figures from the paper 
 
 To get started, we suggest running the demo notebook for the simulated data, which loads or trains a model with tuned hyperparameters, runs the evaluation functions and creates the corresponding plots.
