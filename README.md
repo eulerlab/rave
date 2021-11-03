@@ -13,7 +13,7 @@ We're working on turning the code in this repository into the pip-installable RA
 3. From within the directory containing the ```requirements.txt``` file, run ```pip install -r requirements.txt```
 
 ## Downloading the necessary files
-You can download the data we worked with from here: [https://datadryad.org/stash/share/_8RgRqJg8KgfEI2apytiXg5jrB-vlI7iCTJH6NjzkOY]
+You can download the data we worked with from here: [link pending]
 In order to reproduce the figures from the paper, you need the following data files:
 - Recordings from bipolar cells: Datasets/bio/...
 - simulated bipolar cell responses: Datasets/silico/...
