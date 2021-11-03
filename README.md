@@ -8,7 +8,7 @@ This repository is the official implementation of [https://www.biorxiv.org/conte
 
 ### Disclaimer: Work in progress
 We're working on turning the code in this repository into the pip-installable RAVE-toolbox for removing inter-experimental variability from experiments. For the moment being, you can use it to reproduce the figures from our paper by following the instructions below.
-1. ´´´ git clone ´´´ the repository onto your machine
+1. ```git clone``` the repository onto your machine
 2. Have a look at the packages listed in the requirements file; make sure to remove already installed packages from the list, or to specify specific package versions in case you need them for other projects you're working on. 
 3. From within the directory containing the ```requirements.txt``` file, run ```pip install -r requirements.txt```
 
