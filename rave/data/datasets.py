@@ -7,12 +7,30 @@ from rave.data.utils import combine_data_bc, get_splits
 
 def get_bc_data(data_dir, franke_file_name="bc_franke.pickle",
                 szatko_file_name="bc_szatko.pickle", verbose=True):
+    """
+    Input Parameters
+    --------------------  
+    data_dir : string
+        path string to folder containing datasets
+    
+    franke_file_name : string, default:"bc_franke.pickle"
+        file name of dataset A
+    
+    szatko_file_name : string, default:"bc_szatko.pickle"
+        file name of dataset B
+    
+    Returns
+    --------------------
+    dataset : object
+        Returns the BipCellDataset() object containing both datasets
+    """
     bc_old, bc_new = data_loader_bc(data_dir, franke_file_name, szatko_file_name)
+    
     X, _, _, scan_label, type_label, ipl_depths = combine_data_bc(bc_old, bc_new)
+    
     dataset = BipCellDataset(X, Y_scan=scan_label, Y_type=type_label,
                       ipl_depths=ipl_depths, verbose=verbose)
     return dataset
-
 
 def get_bc_sim_data(sim_data, ipl_depths, random_seed=8000):
     """
@@ -22,10 +40,38 @@ def get_bc_sim_data(sim_data, ipl_depths, random_seed=8000):
     to new chirp version); values are of shape
     n_simulated_neurons (1000) x n_types (14) x time (960)
     """
+    
     return BipCellDataset(*data_loader_sim(sim_data, ipl_depths, random_seed))
 
-
 class BipCellDataset(Dataset):
+    """
+    Create Dataset object.
+    
+    Input Parameters
+    --------------------
+    X : ndarray of shape (n_samples, n_features)
+        Combined datasets.
+    
+    Y_scan : ndarray of shape (n_samples)
+        Indictes the dataset origin of each sample 
+        (e.g., all samples of dataset A = 0 and dataset B = 1)
+    
+    ipl_depths : ndarray (n_samples)
+        IPL depths of each sample
+    
+    Y_type : ndarray of shape (n_samples)
+        Cell type of each sample
+    
+    seed : int, default=42
+    
+    k : int, default=5
+        number for k-fold cross-validation
+
+    test_frac : int, default=10
+        Fraction in which the dataset will be split in train and val
+        
+    """
+
     def __init__(
             self,
             X,
@@ -161,6 +207,24 @@ class BipCellDataset(Dataset):
                       np.mean(self.Y_scan_train == biggest_class))
 
     def get_split(self, split=0, device="cpu"):
+        """
+        Get the splitted dataset.
+                
+        Parameters
+        --------------------
+        
+        split : int, default=0
+            Specifies the split
+            
+        device : string, default="cpu"        
+        
+        Returns
+        --------------------
+        output : list
+            Returns a list of the splitted dataset containing the training and validation sets 
+            of x and y.
+        """
+        
         train_ind, val_ind = self.val_splits[split]
 
         # train
@@ -187,15 +251,57 @@ class BipCellDataset(Dataset):
 
         return output
 
-    def get_ipl_split(self, split=0):
+    def get_ipl_split(self, split=0): 
+        """
+        Split the IPL data into training and validation set.
+        
+        Parameters
+        --------------------
+        
+        split : int, default=0
+            Indicates the split that will be returned
+            
+        Returns
+        --------------------
+        self.ipl_depth_train[train_ind] : ndarray
+            Returns the ipl depth values of the training set
+            
+        self.ipl_depth_train[val_ind] : ndarray
+            Returns the ipl depth values of the validation set   
+        """
+        
         train_ind, val_ind = self.val_splits[split]
         return self.ipl_depth_train[train_ind], self.ipl_depth_train[val_ind]
 
     def __len__(self):
+        """
+        Integer of the training set split length
+        
+        Returns
+        --------------------
+        len(train_ind) : int
+            returns the length of the training set        
+        """
+        
         train_ind, val_ind = self.val_splits[0]
         return len(train_ind)
 
     def __getitem__(self, idx):
+        """
+        Get individual samples.
+        
+        Parameters
+        --------------------
+        idx : int
+            Indicates the sampl index.
+        
+        Returns
+        --------------------
+        output : tuple
+            Returns training data X and y of one sample. If cell type information of y
+            is available it will be returned, otherwise not.        
+        """
+        
         train_idx, val_idx = self.val_splits[0]
         if self.Y_type_train is not None:
             return torch.as_tensor(self.X_train[train_idx[idx]],
@@ -209,6 +315,20 @@ class BipCellDataset(Dataset):
                    self.Y_scan_train[train_idx[idx]].to("cuda")
 
     def get_split_numpy(self, split=0):
+        """
+        ...
+        Parameters
+        --------------------
+        split : int, default=0
+            Indicates which split will be returned.
+        
+        Returns
+        --------------------
+        output : list
+            Returns a list of ndarrays of the splitted dataset containing the 
+            training and validation sets of x and y.
+        """
+        
         train_ind, val_ind = self.val_splits[split]
 
         # train
