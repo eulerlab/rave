@@ -13,14 +13,14 @@ We're working on turning the code in this repository into the pip-installable RA
 3. From within the directory containing the ```requirements.txt``` file, run ```pip install -r requirements.txt```
 
 ## Downloading the necessary files
-You can download the data we worked with from here: [link pending]
+You can download the data we worked with from here: https://doi.org/10.12751/g-node.5iije0 
 In order to reproduce the figures from the paper, you need the following data files:
-- Recordings from bipolar cells: Datasets/bio/...
-- simulated bipolar cell responses: Datasets/silico/...
-- IPL info files: Datasets/ipl/...
+- Recordings from bipolar cells: bio/...
+- simulated bipolar cell responses: silico/...
+- IPL info files: ipl/...
 - 
 ## Reproducing figures from the paper 
 
 To get started, we suggest running the demo notebook for the simulated data, which loads or trains a model with tuned hyperparameters, runs the evaluation functions and creates the corresponding plots.
-The notebook can be found here: ```notebooks/Evaluate_sim_data.ipynb```
+The notebook can be found here: ```notebooks/Evaluate_sim_data_template.ipynb```
 You need to adjust the file paths in the corresponding section of the notebook to reflect the locations of the downloaded files.
