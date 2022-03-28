@@ -1,6 +1,6 @@
 # Removing Inter-Experimental Variability from Functional Data in Systems Neuroscience 
 
-This repository is the official implementation of [https://www.biorxiv.org/content/10.1101/2021.10.29.466492v2.full.pdf+html]. 
+This repository is the official implementation of [https://proceedings.neurips.cc/paper/2021/hash/1e5eeb40a3fce716b244599862fd2200-Abstract.html]. 
 
 ![schematic](framework.jpg)
 
