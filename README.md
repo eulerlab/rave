@@ -6,8 +6,7 @@ This repository is the official implementation of [https://proceedings.neurips.c
 
 ## Getting started
 
-### Disclaimer: Work in progress
-We're working on turning the code in this repository into the pip-installable RAVE-toolbox for removing inter-experimental variability from experiments. For the moment being, you can use it to reproduce the figures from our paper by following the instructions below.
+You can use the code in this repository to reproduce the figures from our paper by following the instructions below.
 1. ```git clone``` the repository onto your machine
 2. Have a look at the packages listed in the requirements file; make sure installing the packages won't mess with your python installation. Then: 
 3. From within the directory containing the ```requirements.txt``` file, run ```pip install -r requirements.txt```
