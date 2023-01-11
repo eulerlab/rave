@@ -1,0 +1,28 @@
+{
+  "datatype": "bc",
+  "model": {
+    "dropout": 0.045864191338534394,
+    "num_hidden": 49,
+    "num_layer_scan_classifier": 3,
+    "num_scans": 2,
+    "num_types": 14,
+    "projection": null
+  },
+  "model_architecture": "v2",
+  "model_type": "general",
+  "training": {
+    "dis_warm_cool_steps": 0,
+    "log_dir": "",
+    "log_steps": 10,
+    "lr_discriminator": 0.0005908769150661808,
+    "lr_model": 5.892303038645746e-05,
+    "num_iter": 1000,
+    "optimizer": "adam",
+    "split": 0,
+    "train_model_every": 9,
+    "weight_decay": 0.004532024235646661,
+    "weight_mse": 3.0563500273839157,
+    "weight_scan": 1,
+    "weight_type": 0
+  }
+}
