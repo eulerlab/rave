@@ -8,4 +8,5 @@ seaborn
 numpy
 torch
 pickle5
+fsspec
 ray
